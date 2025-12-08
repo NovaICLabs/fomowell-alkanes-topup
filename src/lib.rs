@@ -234,17 +234,17 @@ pub struct WithdrawRequest {
 }
 
 async fn withdraw_alkanes(withdraw_request: WithdrawRequest) -> Result<String, String> {
-    if PROCESSED_TRANSACTIONS.with(|set| set.borrow().contains(&withdraw_request.ic_txid)) {
-        return Ok("Transaction already processed".into());
-    }
-    // 检查IC上的txid情况
-
-
-    // 符合条件，添加到提款请求队列
     let pid = caller();
+    let allowed_canister = Principal::from_text("fw4iq-diaaa-aaaah-arela-cai")
+        .map_err(|e| format!("Invalid allowed canister ID: {}", e))?;
+    if pid != allowed_canister {
+        return Err("Unauthorized: Only fomowell canister can call this function".to_string());
+    }
+
     let is_full = WITHDRAW_REQUESTS.with(|requests| {
         requests.borrow().len() >= 10
     });
+
     if is_full {
         append_log("[withdraw-queue] queue full");
         return Err("Withdraw request queue is full".to_string());
