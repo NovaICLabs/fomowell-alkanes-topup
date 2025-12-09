@@ -16,7 +16,6 @@ pub struct AlkaneRecord {
 
 pub type BatchAlkaneData = AlkaneRecord;
 
-/// UTXO 账本记录
 #[derive(Clone, CandidType, Deserialize, Debug)]
 pub struct AlkaneUtxoRecord {
     pub amount: u64,
@@ -109,20 +108,10 @@ pub fn get_token_id_by_alkaneid(alkaneid: String) -> Result<u64, String> {
     })
 }
 
-/// 生成 UTXO 账本键
 fn make_utxo_key(address: &str, alkaneid: &str) -> AlkaneUtxoKey {
     format!("{}:{}", address, alkaneid)
 }
 
-/// 添加或更新 UTXO 账本记录
-/// 
-/// # 参数
-/// * `address` - 地址
-/// * `alkaneid` - Alkane ID
-/// * `utxo` - UTXO 记录
-/// 
-/// # 返回
-/// 成功消息或错误信息
 pub fn set_utxo(address: String, alkaneid: String, utxo: AlkaneUtxoRecord) -> Result<String, String> {
     if !is_authorized() {
         return Err("Unauthorized".into());
