@@ -108,8 +108,8 @@ pub fn get_token_id_by_alkaneid(alkaneid: String) -> Result<u64, String> {
     })
 }
 
-fn make_utxo_key(address: &str, alkaneid: &str) -> AlkaneUtxoKey {
-    format!("{}:{}", address, alkaneid)
+fn make_utxo_key(address: &str, alkaneid: &str, txid: &str, vout: u64) -> AlkaneUtxoKey {
+    format!("{}:{}:{}:{}", address, alkaneid, txid, vout)
 }
 
 pub fn set_utxo(address: String, alkaneid: String, utxo: AlkaneUtxoRecord) -> Result<String, String> {
@@ -117,37 +117,44 @@ pub fn set_utxo(address: String, alkaneid: String, utxo: AlkaneUtxoRecord) -> Re
         return Err("Unauthorized".into());
     }
 
-    let key = make_utxo_key(&address, &alkaneid);
+    let key = make_utxo_key(&address, &alkaneid, &utxo.txid, utxo.vout);
     ALKANE_UTXO_LEDGER.with(|ledger| {
         ledger.borrow_mut().insert(key.clone(), utxo);
     });
 
-    Ok(format!("UTXO set for address: {}, alkaneid: {}", address, alkaneid))
+    Ok(format!("UTXO set for address: {}, alkaneid: {}, txid: {}, vout: {}", 
+        address, alkaneid, key.split(':').nth(2).unwrap_or(""), key.split(':').nth(3).unwrap_or("")))
 }
 
-pub fn get_alkane_fund_utxo(address: String, alkaneid: String) -> Result<AlkaneUtxoRecord, String> {
-    let key = make_utxo_key(&address, &alkaneid);
+
+pub fn get_alkane_fund_utxo(address: String, alkaneid: String) -> Vec<AlkaneUtxoRecord> {
     ALKANE_UTXO_LEDGER.with(|ledger| {
         ledger.borrow()
-            .get(&key)
-            .cloned()
-            .ok_or_else(|| format!("UTXO not found for address: {}, alkaneid: {}", address, alkaneid))
+            .iter()
+            .filter(|(key, _)| {
+                let parts: Vec<&str> = key.split(':').collect();
+                parts.len() >= 2 && 
+                parts.get(0) == Some(&address.as_str()) && 
+                parts.get(1) == Some(&alkaneid.as_str())
+            })
+            .map(|(_, value)| value.clone())
+            .collect()
     })
 }
 
-pub fn remove_utxo(address: String, alkaneid: String) -> Result<String, String> {
+pub fn remove_utxo(address: String, alkaneid: String, txid: String, vout: u64) -> Result<String, String> {
     if !is_authorized() {
         return Err("Unauthorized".into());
     }
 
-    let key = make_utxo_key(&address, &alkaneid);
+    let key = make_utxo_key(&address, &alkaneid, &txid, vout);
     ALKANE_UTXO_LEDGER.with(|ledger| {
         ledger.borrow_mut().remove(&key);
     });
 
-    Ok(format!("UTXO removed for address: {}, alkaneid: {}", address, alkaneid))
+    Ok(format!("UTXO removed for address: {}, alkaneid: {}, txid: {}, vout: {}", 
+        address, alkaneid, txid, vout))
 }
-
 
 
 pub fn get_utxos_by_address(address: String) -> Vec<(String, String, AlkaneUtxoRecord)> {
@@ -169,7 +176,10 @@ pub fn get_utxos_by_alkaneid(alkaneid: String) -> Vec<(String, AlkaneUtxoRecord)
     ALKANE_UTXO_LEDGER.with(|ledger| {
         ledger.borrow()
             .iter()
-            .filter(|(key, _)| key.ends_with(&format!(":{}", alkaneid)))
+            .filter(|(key, _)| {
+                let parts: Vec<&str> = key.split(':').collect();
+                parts.len() >= 2 && parts.get(1) == Some(&alkaneid.as_str())
+            })
             .map(|(key, value)| {
                 // 从键中提取地址
                 let address = key.split(':').next().unwrap_or("").to_string();
